@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: ai-assistant-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: changeme
+      MONGO_INITDB_DATABASE: ai-assistant
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Python AI Service
+  python-service:
+    build: ./python-ai-service
+    container_name: ai-assistant-python
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URI: mongodb://admin:changeme@mongodb:27017/ai-assistant
+      JWT_SECRET: your_secret_key_change_this
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LOG_LEVEL: info
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Backend
+  node-backend:
+    build: ./node-backend
+    container_name: ai-assistant-node
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      NODE_PORT: 5000
+      PYTHON_AI_HOST: python-service
+      PYTHON_AI_PORT: 8000
+      MONGODB_URI: mongodb://admin:changeme@mongodb:27017/ai-assistant
+      JWT_SECRET: your_secret_key_change_this
+    depends_on:
+      python-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:
+
+networks:
+  default:
+    name: ai-assistant-network
