@@ -1,0 +1,9 @@
+# Default service (repo root): Node API — set Root Directory empty OR use node-backend service instead.
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd node-backend && npm install && npm run build"
+
+[deploy]
+startCommand = "node node-backend/dist/server.js"
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

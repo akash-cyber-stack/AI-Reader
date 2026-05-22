@@ -9,6 +9,6 @@
     "start:python": "cd python-ai-service && .venv\\Scripts\\python.exe -m app.main",
     "start:node": "cd node-backend && npm run dev",
     "start:electron": "cd electron-app && npm run dev",
-    "start": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1"
+    "start:local": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1"
   }
 }

@@ -9,8 +9,10 @@ import { asyncHandler, APIError } from '../middleware/errorHandler';
 import { commandService } from '../services/commandService';
 import { executeCommandAction, actionNeedsConfirmation } from '../utils/executeCommand';
 
+import { getPythonApiUrl } from '../config/pythonApi';
+
 const router = Router();
-const PYTHON_API_URL = `http://${process.env.PYTHON_AI_HOST || 'localhost'}:${process.env.PYTHON_AI_PORT || 8000}`;
+const PYTHON_API_URL = getPythonApiUrl();
 
 /**
  * POST /api/commands/process

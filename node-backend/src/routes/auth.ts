@@ -6,8 +6,10 @@ import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { asyncHandler, APIError } from '../middleware/errorHandler';
 
+import { getPythonApiUrl } from '../config/pythonApi';
+
 const router = Router();
-const PYTHON_API_URL = `http://${process.env.PYTHON_AI_HOST || 'localhost'}:${process.env.PYTHON_AI_PORT || 8000}`;
+const PYTHON_API_URL = getPythonApiUrl();
 const PYTHON_TIMEOUT_MS = 15000;
 
 const pythonClient = axios.create({

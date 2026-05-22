@@ -1,22 +1,23 @@
-FROM node:18-alpine
+FROM node:20-alpine AS builder
 
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
 
-# Install dependencies
-RUN npm ci --only=production
+FROM node:20-alpine
 
-# Copy built app
-COPY dist/ ./dist/
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/dist ./dist
 
-# Expose port
+ENV NODE_ENV=production
 EXPOSE 5000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:5000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD wget -qO- http://127.0.0.1:${PORT:-5000}/health || exit 1
 
-# Run application
 CMD ["node", "dist/server.js"]

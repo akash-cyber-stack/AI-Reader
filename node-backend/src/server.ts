@@ -19,7 +19,7 @@ import loggingRoutes from './routes/logging';
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const app: Express = express();
-const PORT = process.env.NODE_PORT || 5000;
+const PORT = Number(process.env.PORT || process.env.NODE_PORT || 5000);
 
 // Middleware
 app.use(helmet());
@@ -75,7 +75,7 @@ app.use((req: Request, res: Response) => {
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`✓ Node.js Backend running on port ${PORT}`);
   console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`✓ Python AI Service: ${process.env.PYTHON_AI_HOST}:${process.env.PYTHON_AI_PORT}`);

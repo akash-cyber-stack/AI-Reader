@@ -4,6 +4,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { getPythonApiUrl } from '../config/pythonApi';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -28,10 +29,8 @@ export class CommandExecutionService {
   private pythonApi: AxiosInstance;
 
   constructor() {
-    const pythonUrl = `http://${process.env.PYTHON_AI_HOST || 'localhost'}:${process.env.PYTHON_AI_PORT || 8000}`;
-    
     this.pythonApi = axios.create({
-      baseURL: pythonUrl,
+      baseURL: getPythonApiUrl(),
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json'

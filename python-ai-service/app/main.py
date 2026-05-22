@@ -86,7 +86,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv('PYTHON_AI_PORT', 8000))
+    port = int(os.getenv('PORT', os.getenv('PYTHON_AI_PORT', 8000)))
     reload = os.getenv('PYTHON_RELOAD', 'false').lower() == 'true'
     uvicorn.run(
         "app.main:app",
