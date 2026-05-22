@@ -8,6 +8,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/VoiceEnrollment.css';
 import '../styles/global.d.ts';
 import { blobToWav } from '../utils/audio';
+import { PYTHON_API } from '../config/api';
 
 interface VoiceEnrollmentPageProps {
   token: any;
@@ -36,7 +37,7 @@ export const VoiceEnrollmentPage: React.FC<VoiceEnrollmentPageProps> = ({
   useEffect(() => {
     const loadEnrollmentStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/voice/status', {
+        const response = await fetch(`${PYTHON_API}/api/voice/status`, {
           headers: {
             'Authorization': `Bearer ${token.token}`
           }
@@ -112,7 +113,7 @@ export const VoiceEnrollmentPage: React.FC<VoiceEnrollmentPageProps> = ({
       formData.append('sampleNumber', String(samples + 1));
       formData.append('phrase', currentSentence);
 
-      const response = await fetch('http://localhost:8000/api/voice/enroll', {
+      const response = await fetch(`${PYTHON_API}/api/voice/enroll`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token.token}`

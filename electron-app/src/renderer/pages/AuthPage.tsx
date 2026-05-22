@@ -8,8 +8,9 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/Auth.css';
 // @ts-ignore: Importing CSS module types
 import '../styles/global.d.ts';
+import { NODE_API } from '../config/api';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = NODE_API;
 const REQUEST_TIMEOUT_MS = 20000;
 
 interface AuthPageProps {

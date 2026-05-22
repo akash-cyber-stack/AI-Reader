@@ -10,6 +10,7 @@ import { FeatureModal } from '../components/FeatureModal';
 import { useSettings } from '../context/SettingsContext';
 import { FEATURE_CATEGORIES, FeatureCategory } from '../data/featureCategories';
 import { arrayBufferToBase64, blobToWav } from '../utils/audio';
+import { NODE_API, PYTHON_API } from '../config/api';
 
 interface MainDashboardProps {
   token: { token: string };
@@ -100,8 +101,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         }
       };
       setServices({
-        node: await ping('http://localhost:5000/health'),
-        python: await ping('http://localhost:8000/health')
+        node: await ping(`${NODE_API}/health`),
+        python: await ping(`${PYTHON_API}/health`)
       });
     };
     check();
@@ -195,7 +196,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       const wavBlob = await blobToWav(audioBlob);
       const base64Audio = arrayBufferToBase64(await wavBlob.arrayBuffer());
 
-      const response = await fetch('http://localhost:5000/api/commands/process', {
+      const response = await fetch(`${NODE_API}/api/commands/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,7 +264,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       if (!pending.action) return;
 
       setStatus('EXECUTING');
-      const response = await fetch('http://localhost:5000/api/commands/confirm', {
+      const response = await fetch(`${NODE_API}/api/commands/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

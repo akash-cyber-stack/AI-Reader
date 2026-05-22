@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/ManageUsers.css';
+import { NODE_API } from '../config/api';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = NODE_API;
 
 interface UserRow {
   id: string;

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd electron-app && npm install",
+  "buildCommand": "cd electron-app && CI=true PUBLIC_URL=/ npm run react-build",
+  "outputDirectory": "electron-app/build",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

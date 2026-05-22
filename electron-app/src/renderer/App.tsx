@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ManageUsersPage } from './pages/ManageUsersPage';
 import { MobileNav, NavPage } from './components/MobileNav';
 import './App.css';
+import { PYTHON_API } from './config/api';
 
 type PageType = 'auth' | 'enrollment' | 'dashboard' | 'settings' | 'users';
 
@@ -49,7 +50,7 @@ export const App: React.FC = () => {
       setAuthToken(parsed);
       setUser(parsed.user);
 
-      fetch('http://localhost:8000/api/voice/status', {
+      fetch(`${PYTHON_API}/api/voice/status`, {
         headers: { Authorization: `Bearer ${parsed.token}` }
       })
         .then((r) => r.json())
@@ -65,7 +66,7 @@ export const App: React.FC = () => {
     setUser(token.user);
     localStorage.setItem('authToken', JSON.stringify(token));
 
-    fetch('http://localhost:8000/api/voice/status', {
+    fetch(`${PYTHON_API}/api/voice/status`, {
       headers: { Authorization: `Bearer ${token.token}` }
     })
       .then((r) => r.json())
