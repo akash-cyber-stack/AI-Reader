@@ -1,5 +1,9 @@
+# Fallback if Dockerfile builder is not used
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.11"
+
 [phases.setup]
-nixPkgs = ["python311"]
+nixPkgs = ["python311", "gcc"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
