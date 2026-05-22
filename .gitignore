@@ -52,6 +52,9 @@ logs/
 # MongoDB
 .mongodb/
 
+# Local user database (passwords)
+python-ai-service/data/local_db.json
+
 # Temporary files
 *.tmp
 temp/

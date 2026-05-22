@@ -6,13 +6,57 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Header
 from typing import Optional
 import logging
 
-from app.models.schemas import SignupRequest, LoginRequest, AuthResponse
+from app.models.schemas import SignupRequest, LoginRequest, AuthResponse, CreateUserRequest
 from app.services.auth_service import AuthenticationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 auth_service = AuthenticationService()
+
+
+def _user_id_from_header(authorization: Optional[str]) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing authentication token")
+    token = authorization.replace("Bearer ", "")
+    user_id = auth_service.verify_token(token, "access")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return user_id
+
+
+@router.get("/users")
+async def list_users(authorization: str = Header(None)):
+    """List users (owner only)."""
+    try:
+        owner_id = _user_id_from_header(authorization)
+        await auth_service.require_owner(owner_id)
+        users = await auth_service.list_users()
+        return {"success": True, "users": users}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/users")
+async def create_user(request: CreateUserRequest, authorization: str = Header(None)):
+    """Create a user (owner only)."""
+    try:
+        owner_id = _user_id_from_header(authorization)
+        user = await auth_service.create_user_as_owner(
+            owner_id, request.username, request.password, request.email
+        )
+        return {
+            "success": True,
+            "user": {
+                "id": str(user["_id"]),
+                "username": user["username"],
+                "email": user.get("email"),
+                "isOwner": user.get("isOwner", False),
+            },
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/signup", response_model=AuthResponse)
 async def signup(request: SignupRequest):

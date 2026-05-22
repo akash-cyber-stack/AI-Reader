@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/VoiceEnrollment.css';
 import '../styles/global.d.ts';
 import { blobToWav } from '../utils/audio';
@@ -146,8 +147,11 @@ export const VoiceEnrollmentPage: React.FC<VoiceEnrollmentPageProps> = ({
 
   return (
     <div className="enrollment-container">
+      <div className="enrollment-top-bar">
+        <ThemeToggle />
+      </div>
       <div className="enrollment-card">
-        <h1>Voice Enrollment</h1>
+        <h1>🎙️ Voice Enrollment</h1>
         <p className="subtitle">Save the owner's voice with three fixed sentences</p>
 
         <div className="enrollment-info">

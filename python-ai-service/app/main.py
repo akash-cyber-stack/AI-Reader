@@ -44,8 +44,14 @@ app.add_middleware(
 async def startup_event():
     """Initialize database and load models on startup"""
     logger.info("Starting up AI service...")
-    await init_db()
-    logger.info("Database initialized")
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception as exc:
+        logger.warning(
+            "MongoDB not available (%s). Using local file storage in python-ai-service/data/",
+            exc,
+        )
     logger.info("AI Service started successfully")
 
 @app.on_event("shutdown")
@@ -81,4 +87,10 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv('PYTHON_AI_PORT', 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
+    reload = os.getenv('PYTHON_RELOAD', 'false').lower() == 'true'
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=reload,
+    )

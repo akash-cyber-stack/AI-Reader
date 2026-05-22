@@ -11,13 +11,18 @@ db: AsyncIOMotorDatabase = None
 async def init_db():
     """Initialize MongoDB connection"""
     global client, db
-    
+
     mongodb_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/ai-assistant')
-    client = AsyncIOMotorClient(mongodb_uri)
-    db = client.get_database()
-    
-    # Create indexes
-    await create_indexes()
+    try:
+        client = AsyncIOMotorClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        db = client.get_database()
+        await create_indexes()
+    except Exception:
+        if client:
+            client.close()
+        client = None
+        db = None
+        raise
 
 async def close_db():
     """Close MongoDB connection"""

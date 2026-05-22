@@ -6,12 +6,12 @@ Handles user registration, login, JWT tokens, and voice enrollment
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 import jwt
 from passlib.context import CryptContext
 from bson import ObjectId
 
-from app.database.mongodb import get_db
+from app.database import storage
 from app.services.voice_service import VoiceVerificationService
 
 logger = logging.getLogger(__name__)
@@ -33,55 +33,61 @@ class AuthenticationService:
         
         logger.info("Authentication Service initialized")
     
-    async def register_user(self, username: str, password: str, email: Optional[str] = None) -> dict:
+    def _public_signup_allowed(self) -> bool:
+        return os.getenv("ALLOW_PUBLIC_SIGNUP", "false").lower() == "true"
+
+    async def register_user(
+        self,
+        username: str,
+        password: str,
+        email: Optional[str] = None,
+        *,
+        force_owner_create: bool = False,
+        as_owner: bool = False,
+    ) -> dict:
         """
-        Register a new user
-        
-        Args:
-            username: Unique username
-            password: User password (will be hashed)
-            email: Optional email address
-        
-        Returns:
-            User document
+        Register a user. Public signup only if ALLOW_PUBLIC_SIGNUP=true or first user.
+        Owner may create users with force_owner_create=True.
         """
         try:
-            db = get_db()
-            
-            # Check if user exists
-            existing_user = await db['users'].find_one({'username': username})
+            user_count = await storage.count_users()
+            if not force_owner_create and user_count > 0 and not self._public_signup_allowed():
+                raise ValueError(
+                    "Public registration is disabled. Ask the owner to create your account."
+                )
+
+            existing_user = await storage.find_user_by_username(username)
             if existing_user:
                 raise ValueError("Username already exists")
-            
-            # Hash password
+
             password_hash = pwd_context.hash(password)
-            
-            # Create user document
             user_doc = {
                 'username': username,
                 'email': email,
                 'passwordHash': password_hash,
                 'voiceProfileId': None,
-                'isOwner': False,  # First user becomes owner
+                'isOwner': False,
                 'createdAt': datetime.utcnow(),
                 'updatedAt': datetime.utcnow()
             }
-            
-            # Check if this is the first user (becomes owner)
-            user_count = await db['users'].count_documents({})
-            if user_count == 0:
+
+            if user_count == 0 and not force_owner_create:
                 user_doc['isOwner'] = True
                 logger.info(f"First user registered as owner: {username}")
-            
-            # Insert user
-            result = await db['users'].insert_one(user_doc)
-            user_doc['_id'] = result.inserted_id
-            
-            logger.info(f"User registered: {username}")
+            elif force_owner_create:
+                user_doc['isOwner'] = bool(as_owner)
+
+            user_doc = await storage.insert_user(user_doc)
+            if not storage.mongo_available():
+                logger.info("User registered (local storage): %s", username)
+            else:
+                logger.info("User registered: %s", username)
             return user_doc
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"Error registering user: {e}")
-            raise
+            raise ValueError("Could not register user. Please try again.") from e
     
     async def login_user(self, username: str, password: str) -> tuple:
         """
@@ -95,26 +101,24 @@ class AuthenticationService:
             Tuple of (access_token, refresh_token, user_doc)
         """
         try:
-            db = get_db()
-            
-            # Find user
-            user = await db['users'].find_one({'username': username})
+            user = await storage.find_user_by_username(username)
             if not user:
                 raise ValueError("Invalid username or password")
-            
-            # Verify password
+
             if not pwd_context.verify(password, user['passwordHash']):
                 raise ValueError("Invalid username or password")
-            
-            # Generate tokens
-            access_token = self._generate_token(str(user['_id']), 'access')
-            refresh_token = self._generate_token(str(user['_id']), 'refresh')
-            
-            logger.info(f"User logged in: {username}")
+
+            user_id = str(user['_id'])
+            access_token = self._generate_token(user_id, 'access')
+            refresh_token = self._generate_token(user_id, 'refresh')
+
+            logger.info("User logged in: %s", username)
             return access_token, refresh_token, user
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"Error logging in user: {e}")
-            raise
+            raise ValueError("Login failed. Please try again.") from e
     
     async def enroll_voice_profile(self, user_id: str, voice_samples: list) -> dict:
         """
@@ -128,32 +132,30 @@ class AuthenticationService:
             Voice profile document
         """
         try:
-            db = get_db()
-            
-            # Generate embeddings from voice samples
             embeddings = await self.voice_service.enroll_voice(voice_samples)
-            
-            # Create voice profile
-            voice_profile = {
-                'userId': ObjectId(user_id),
-                'voiceEmbeddings': embeddings,
-                'enrollmentSamples': len(voice_samples),
-                'createdAt': datetime.utcnow(),
-                'updatedAt': datetime.utcnow()
-            }
-            
-            # Insert voice profile
-            result = await db['voice_profiles'].insert_one(voice_profile)
-            voice_profile['_id'] = result.inserted_id
-            
-            # Update user with voice profile ID
-            await db['users'].update_one(
-                {'_id': ObjectId(user_id)},
-                {'$set': {'voiceProfileId': str(result.inserted_id)}}
-            )
-            
-            logger.info(f"Voice profile created for user: {user_id}")
-            return voice_profile
+            from app.database.mongodb import get_db
+
+            db = get_db()
+            if db is not None:
+                voice_profile = {
+                    'userId': ObjectId(user_id),
+                    'voiceEmbeddings': embeddings,
+                    'enrollmentSamples': len(voice_samples),
+                    'createdAt': datetime.utcnow(),
+                    'updatedAt': datetime.utcnow()
+                }
+                result = await db['voice_profiles'].insert_one(voice_profile)
+                voice_profile['_id'] = result.inserted_id
+                await db['users'].update_one(
+                    {'_id': ObjectId(user_id)},
+                    {'$set': {'voiceProfileId': str(result.inserted_id)}}
+                )
+                return voice_profile
+
+            import uuid
+            profile_id = str(uuid.uuid4())
+            await storage.update_user(user_id, {'voiceProfileId': profile_id})
+            return {'_id': profile_id, 'userId': user_id, 'voiceEmbeddings': embeddings}
         except Exception as e:
             logger.error(f"Error enrolling voice: {e}")
             raise
@@ -221,12 +223,33 @@ class AuthenticationService:
             logger.warning(f"Invalid token")
             return None
     
+    async def require_owner(self, user_id: str) -> dict:
+        user = await self.get_user_by_id(user_id)
+        if not user or not user.get("isOwner"):
+            raise ValueError("Owner access required")
+        return user
+
+    async def list_users(self) -> List[dict]:
+        return await storage.list_users_public()
+
+    async def create_user_as_owner(
+        self,
+        owner_id: str,
+        username: str,
+        password: str,
+        email: Optional[str] = None,
+    ) -> dict:
+        await self.require_owner(owner_id)
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return await self.register_user(
+            username, password, email, force_owner_create=True, as_owner=False
+        )
+
     async def get_user_by_id(self, user_id: str) -> Optional[dict]:
         """Get user document by ID"""
         try:
-            db = get_db()
-            user = await db['users'].find_one({'_id': ObjectId(user_id)})
-            return user
+            return await storage.find_user_by_id(user_id)
         except Exception as e:
             logger.error(f"Error fetching user: {e}")
             return None

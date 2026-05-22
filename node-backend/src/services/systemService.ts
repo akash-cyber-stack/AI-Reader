@@ -23,20 +23,32 @@ export class SystemControlService {
   private isMac = platform() === 'darwin';
   private isLinux = platform() === 'linux';
 
+  private expandPath(inputPath: string): string {
+    const home = process.env.USERPROFILE || process.env.HOME || '';
+    return inputPath
+      .replace(/%USERPROFILE%/gi, home)
+      .replace(/^~([\\/]|$)/, `${home}$1`)
+      .replace(/^~/, home);
+  }
+
   /**
    * Open an application by name
    */
   async openApp(appName: string, appArgs?: string[]): Promise<CommandResult> {
     try {
       const args = appArgs || [];
-      
+      const name = appName.trim();
+
       if (this.isWindows) {
-        // Windows: use start command
-        const command = `start ${appName}`;
-        execAsync(command);
+        if (name.includes(':') && !name.includes(' ')) {
+          await execAsync(`start "" "${name}"`, { shell: 'cmd.exe' });
+        } else {
+          const argPart = args.length ? ` ${args.map((a) => `"${a}"`).join(' ')}` : '';
+          await execAsync(`start "" "${name}"${argPart}`, { shell: 'cmd.exe' });
+        }
         return {
           success: true,
-          output: `Opening ${appName}`
+          output: `Opening ${name}`
         };
       } else if (this.isMac) {
         // macOS: use open command
@@ -135,19 +147,39 @@ export class SystemControlService {
   }
 
   /**
-   * Delete a file
+   * Delete a file (owner: allowed under user profile)
    */
-  async deleteFile(filePath: string): Promise<CommandResult> {
+  async deleteFile(
+    filePath: string,
+    options?: { ownerMode?: boolean }
+  ): Promise<CommandResult> {
     try {
-      // Security check: prevent deletion outside user directory
-      if (filePath.includes('..') || filePath.startsWith('/')) {
+      const resolved = this.expandPath(filePath.trim());
+      if (!resolved) {
+        throw new Error('File path is required');
+      }
+
+      const home = process.env.USERPROFILE || process.env.HOME || '';
+      const normalized = path.resolve(resolved);
+      const homeResolved = path.resolve(home);
+
+      if (options?.ownerMode) {
+        const blocked = ['windows', 'system32', 'program files'];
+        const lower = normalized.toLowerCase();
+        if (blocked.some((part) => lower.includes(`\\${part}\\`) || lower.includes(`/${part}/`))) {
+          throw new Error('Cannot delete system files');
+        }
+        if (home && !normalized.toLowerCase().startsWith(homeResolved.toLowerCase())) {
+          throw new Error('Owner can only delete files inside the user profile');
+        }
+      } else if (filePath.includes('..')) {
         throw new Error('Access denied');
       }
-      
-      await fs.unlink(filePath);
+
+      await fs.unlink(normalized);
       return {
         success: true,
-        output: `File deleted: ${filePath}`
+        output: `File deleted: ${normalized}`
       };
     } catch (error: any) {
       return {
@@ -162,10 +194,12 @@ export class SystemControlService {
    */
   async createFile(filePath: string, content: string): Promise<CommandResult> {
     try {
-      await fs.writeFile(filePath, content, 'utf-8');
+      const resolved = this.expandPath(filePath);
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
+      await fs.writeFile(resolved, content, 'utf-8');
       return {
         success: true,
-        output: `File created: ${filePath}`
+        output: `File created: ${resolved}`
       };
     } catch (error: any) {
       return {
@@ -178,28 +212,45 @@ export class SystemControlService {
   /**
    * Open a folder/directory
    */
+  async openFile(filePath: string): Promise<CommandResult> {
+    try {
+      const resolved = this.expandPath(filePath);
+      if (this.isWindows) {
+        await execAsync(`start "" "${resolved}"`, { shell: 'cmd.exe' });
+      } else if (this.isMac) {
+        await execAsync(`open "${resolved}"`);
+      } else if (this.isLinux) {
+        await execAsync(`xdg-open "${resolved}"`);
+      }
+      return { success: true, output: `Opening file: ${resolved}` };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
   async openFolder(folderPath: string): Promise<CommandResult> {
     try {
+      const resolved = this.expandPath(folderPath);
       if (this.isWindows) {
-        const command = `start "" "${folderPath}"`;
-        execAsync(command);
+        const command = `start "" "${resolved}"`;
+        await execAsync(command, { shell: 'cmd.exe' });
         return {
           success: true,
-          output: `Opening folder: ${folderPath}`
+          output: `Opening folder: ${resolved}`
         };
       } else if (this.isMac) {
-        const command = `open "${folderPath}"`;
-        execAsync(command);
+        const command = `open "${resolved}"`;
+        await execAsync(command);
         return {
           success: true,
-          output: `Opening folder: ${folderPath}`
+          output: `Opening folder: ${resolved}`
         };
       } else if (this.isLinux) {
-        const command = `xdg-open "${folderPath}"`;
-        execAsync(command);
+        const command = `xdg-open "${resolved}"`;
+        await execAsync(command);
         return {
           success: true,
-          output: `Opening folder: ${folderPath}`
+          output: `Opening folder: ${resolved}`
         };
       }
       
@@ -222,8 +273,16 @@ export class SystemControlService {
       }
 
       if (this.isWindows) {
-        // Windows: Use nircmd or similar
-        // This is a placeholder - actual implementation would use Windows APIs
+        if (volume === 0) {
+          await execAsync(
+            'powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"'
+          );
+        } else {
+          const steps = Math.max(1, Math.round(volume / 2));
+          await execAsync(
+            `powershell -NoProfile -Command "$s=New-Object -ComObject WScript.Shell; 1..${steps} | ForEach-Object { $s.SendKeys([char]175) }"`
+          );
+        }
         return {
           success: true,
           output: `Volume set to ${volume}%`
@@ -366,6 +425,63 @@ export class SystemControlService {
         error: error.message
       };
     }
+  }
+
+  async lockScreen(): Promise<CommandResult> {
+    try {
+      if (this.isWindows) {
+        await execAsync('rundll32.exe user32.dll,LockWorkStation');
+      } else if (this.isMac) {
+        await execAsync(
+          '/System/Library/CoreServices/Menu\\ Extras/User.menu/Contents/Resources/CGSession -suspend'
+        );
+      } else if (this.isLinux) {
+        await execAsync('loginctl lock-session');
+      }
+      return { success: true, output: 'Screen locked' };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sleepSystem(): Promise<CommandResult> {
+    try {
+      if (this.isWindows) {
+        await execAsync('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
+      } else if (this.isMac) {
+        await execAsync('pmset sleepnow');
+      } else if (this.isLinux) {
+        await execAsync('systemctl suspend');
+      }
+      return { success: true, output: 'System sleeping' };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async typeText(text: string): Promise<CommandResult> {
+    try {
+      const escaped = text.replace(/'/g, "''").replace(/"/g, '`"');
+      if (this.isWindows) {
+        await execAsync(
+          `powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${escaped.replace(/[+^%~[\](){}]/g, '{$&}')}')"`
+        );
+      } else if (this.isMac) {
+        await execAsync(`osascript -e 'tell application "System Events" to keystroke "${escaped}"'`);
+      } else if (this.isLinux) {
+        await execAsync(`xdotool type "${escaped}"`);
+      }
+      return { success: true, output: 'Text typed' };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Run a shell command for the verified owner (blocked patterns only)
+   */
+  async runOwnerCommand(command: string): Promise<CommandResult> {
+    return this.executeCustomCommand(command);
   }
 
   /**

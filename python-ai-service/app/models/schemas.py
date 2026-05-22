@@ -18,6 +18,11 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class CreateUserRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8)
+    email: Optional[EmailStr] = None
+
 class AuthResponse(BaseModel):
     token: str
     refreshToken: str
@@ -58,14 +63,20 @@ class CommandType(str, Enum):
     DELETE_FILE = "DELETE_FILE"
     CREATE_FILE = "CREATE_FILE"
     OPEN_FOLDER = "OPEN_FOLDER"
+    OPEN_FILE = "OPEN_FILE"
     SET_VOLUME = "SET_VOLUME"
+    MUTE_VOLUME = "MUTE_VOLUME"
     SCREENSHOT = "SCREENSHOT"
     SYSTEM_SHUTDOWN = "SYSTEM_SHUTDOWN"
     SYSTEM_RESTART = "SYSTEM_RESTART"
+    LOCK_SCREEN = "LOCK_SCREEN"
+    SLEEP_SYSTEM = "SLEEP_SYSTEM"
+    TYPE_TEXT = "TYPE_TEXT"
+    RUN_COMMAND = "RUN_COMMAND"
     CUSTOM_COMMAND = "CUSTOM_COMMAND"
 
 class CommandAction(BaseModel):
-    type: CommandType
+    type: str
     parameters: dict = {}
     requiresConfirmation: bool = False
 

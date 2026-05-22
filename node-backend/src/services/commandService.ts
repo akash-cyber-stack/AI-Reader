@@ -51,7 +51,10 @@ export class CommandExecutionService {
       // Default dangerous commands
       return {
         dangerous: ['DELETE_FILE', 'SYSTEM_SHUTDOWN', 'SYSTEM_RESTART'],
-        safe: ['OPEN_APP', 'CLOSE_APP', 'SCREENSHOT']
+        safe: [
+          'OPEN_APP', 'OPEN_URL', 'CLOSE_APP', 'SCREENSHOT', 'OPEN_FOLDER', 'OPEN_FILE',
+          'CREATE_FILE', 'SET_VOLUME', 'MUTE_VOLUME', 'LOCK_SCREEN', 'SLEEP_SYSTEM', 'TYPE_TEXT', 'RUN_COMMAND'
+        ]
       };
     }
   }
@@ -192,12 +195,32 @@ export class CommandExecutionService {
           break;
 
         case 'SCREENSHOT':
-          // No required parameters
+        case 'LOCK_SCREEN':
+        case 'SLEEP_SYSTEM':
+        case 'MUTE_VOLUME':
+          break;
+
+        case 'OPEN_FILE':
+          if (!parameters.filePath) {
+            return { valid: false, error: 'Missing filePath parameter' };
+          }
+          break;
+
+        case 'TYPE_TEXT':
+          if (!parameters.text) {
+            return { valid: false, error: 'Missing text parameter' };
+          }
+          break;
+
+        case 'RUN_COMMAND':
+        case 'CUSTOM_COMMAND':
+          if (!parameters.command) {
+            return { valid: false, error: 'Missing command parameter' };
+          }
           break;
 
         case 'SYSTEM_SHUTDOWN':
         case 'SYSTEM_RESTART':
-          // Dangerous - should have confirmation
           break;
 
         default:

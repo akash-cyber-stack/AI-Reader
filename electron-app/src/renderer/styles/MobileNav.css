@@ -1,0 +1,53 @@
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-glass);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  justify-content: space-around;
+  gap: 4px;
+}
+
+.mobile-nav button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  min-height: 48px;
+  min-width: 64px;
+}
+
+.mobile-nav button span:first-child {
+  font-size: 1.25rem;
+}
+
+.mobile-nav button.active {
+  color: var(--accent-hover);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+@media (max-width: 900px) {
+  .mobile-nav {
+    display: flex;
+  }
+
+  .dashboard,
+  .settings-page,
+  .users-page {
+    padding-bottom: 80px;
+  }
+}

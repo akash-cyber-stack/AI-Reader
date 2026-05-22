@@ -54,7 +54,7 @@ async def interpret_command(
         
         # Check if command requires confirmation
         dangerous_commands = command_service.get_dangerous_commands()
-        requires_confirmation = action['type'] in dangerous_commands
+        requires_confirmation = bool(action.get('requiresConfirmation')) or action['type'] in dangerous_commands
         
         return ProcessCommandResponse(
             command=request.text,

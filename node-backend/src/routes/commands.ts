@@ -7,7 +7,7 @@ import FormData from 'form-data';
 import axios from 'axios';
 import { asyncHandler, APIError } from '../middleware/errorHandler';
 import { commandService } from '../services/commandService';
-import { systemService } from '../services/systemService';
+import { executeCommandAction, actionNeedsConfirmation } from '../utils/executeCommand';
 
 const router = Router();
 const PYTHON_API_URL = `http://${process.env.PYTHON_AI_HOST || 'localhost'}:${process.env.PYTHON_AI_PORT || 8000}`;
@@ -95,11 +95,11 @@ router.post('/process', asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    // Step 4: Check if command is dangerous
-    const isDangerous = await commandService.isCommandDangerous(action.type);
+    // Step 4: Dangerous actions need voice confirmation
+    const { dangerous } = await commandService.getDangerousCommands();
+    const needsConfirmation = actionNeedsConfirmation(action, dangerous);
 
-    // If dangerous, return for confirmation
-    if (isDangerous) {
+    if (needsConfirmation) {
       console.log(`⚠ Command is dangerous, requiring confirmation`);
       return res.json({
         success: true,
@@ -117,47 +117,10 @@ router.post('/process', asyncHandler(async (req: Request, res: Response) => {
     let executionResult: any;
 
     try {
-      switch (action.type) {
-        case 'OPEN_APP':
-          executionResult = await systemService.openApp(
-            action.parameters.appName,
-            action.parameters.arguments
-          );
-          break;
+      executionResult = await executeCommandAction(action);
 
-        case 'OPEN_URL':
-          executionResult = await systemService.openUrl(action.parameters.url);
-          break;
-
-        case 'CLOSE_APP':
-          executionResult = await systemService.closeApp(action.parameters.appName);
-          break;
-
-        case 'DELETE_FILE':
-          executionResult = await systemService.deleteFile(action.parameters.filePath);
-          break;
-
-        case 'CREATE_FILE':
-          executionResult = await systemService.createFile(
-            action.parameters.filePath,
-            action.parameters.content
-          );
-          break;
-
-        case 'OPEN_FOLDER':
-          executionResult = await systemService.openFolder(action.parameters.folderPath);
-          break;
-
-        case 'SET_VOLUME':
-          executionResult = await systemService.setVolume(action.parameters.volume);
-          break;
-
-        case 'SCREENSHOT':
-          executionResult = await systemService.takeScreenshot(action.parameters.outputPath);
-          break;
-
-        default:
-          throw new Error(`Unknown command type: ${action.type}`);
+      if (!executionResult.success) {
+        throw new Error(executionResult.error || 'Command execution failed');
       }
 
       console.log(`✓ Command executed successfully`);
@@ -219,23 +182,10 @@ router.post('/confirm', asyncHandler(async (req: Request, res: Response) => {
 
   try {
     // Execute the dangerous command
-    let executionResult: any;
+    const executionResult = await executeCommandAction(action);
 
-    switch (action.type) {
-      case 'DELETE_FILE':
-        executionResult = await systemService.deleteFile(action.parameters.filePath);
-        break;
-
-      case 'SYSTEM_SHUTDOWN':
-        executionResult = await systemService.systemShutdown();
-        break;
-
-      case 'SYSTEM_RESTART':
-        executionResult = await systemService.systemRestart();
-        break;
-
-      default:
-        throw new APIError(400, `Cannot confirm command type: ${action.type}`);
+    if (!executionResult.success) {
+      throw new APIError(500, executionResult.error || 'Command execution failed');
     }
 
     // Log execution
