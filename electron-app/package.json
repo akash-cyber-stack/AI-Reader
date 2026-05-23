@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && npm run electron-dev\"",
     "react-start": "react-scripts start",
+    "prereact-build": "node scripts/write-env-config.js",
     "react-build": "react-scripts build",
+    "build:vercel": "node scripts/write-env-config.js && react-scripts build",
     "electron-dev": "electron .",
     "serve-build": "node scripts/serve-build.js",
     "electron-build": "electron-builder",

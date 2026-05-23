@@ -30,10 +30,15 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = os.getenv('CORS_ORIGIN', 'http://localhost:3000,http://localhost:5000').split(',')
+_cors_env = os.getenv('CORS_ORIGIN', '').strip()
+cors_origins = [o.strip() for o in _cors_env.split(',') if o.strip()] or [
+    'http://localhost:3000',
+    'http://localhost:5000',
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r'https://.*\.vercel\.app',
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

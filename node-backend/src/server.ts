@@ -23,10 +23,25 @@ const PORT = Number(process.env.PORT || process.env.NODE_PORT || 5000);
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
-  credentials: true
-}));
+const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean);
+app.use(
+  cors({
+    origin: corsOrigins?.length
+      ? corsOrigins
+      : (origin, callback) => {
+          if (
+            !origin ||
+            origin.includes('localhost') ||
+            /\.vercel\.app$/i.test(origin)
+          ) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
+    credentials: true
+  })
+);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(requestLogger);
